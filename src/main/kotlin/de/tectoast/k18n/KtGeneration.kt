@@ -5,53 +5,83 @@ import org.gradle.api.logging.Logger
 import java.io.File
 
 class KtGeneration(val logger: Logger) {
-    fun generate(config: Config, outputDir: File, finalMap: Map<String, Map<String, TranslationEntry>>) {
+    companion object {
         val translatableInterface = ClassName("de.tectoast.k18n.generated", "K18nMessage")
+    }
+
+    fun generate(config: Config, outputDir: File, finalMap: Map<String, Map<String, TranslationEntry>>) {
         generateMetaFile(config, outputDir)
-        for ((packageName, entries) in finalMap) {
-            val fileSpecBuilder = FileSpec.builder(
-                "${if (config.withBasePackage) "de.tectoast.k18n.generated." else ""}$packageName",
-                "data"
-            )
-            for ((objName, entry) in entries) {
-                val finalName = "K18n_${objName}"
-                val funSpec = FunSpec.builder("translateTo")
-                    .addModifiers(KModifier.OVERRIDE)
-                    .addParameter("language", ClassName("de.tectoast.k18n.generated", "K18nLanguage"))
-                    .returns(String::class)
-                    .addCode(
-                        """
-                                return when(language) {
-                                    ${
-                            entry.translations.entries.joinToString("\n") {
-                                val langs =
-                                    if (it.key == config.defaultLanguage) (config.languages - entry.translations.keys) + config.defaultLanguage else listOf(
-                                        it.key
-                                    )
-                                "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}" }} -> \"${it.value}\""
-                            }
-                        }
-                                }
-                                """.trimIndent()
-                    )
-                    .build()
-                if (entry.arguments.isEmpty()) {
-                    fileSpecBuilder.addType(
-                        TypeSpec.objectBuilder(finalName)
-                            .addSuperinterface(translatableInterface)
-                            .addFunction(funSpec).build()
-                    )
-                } else {
-                    fileSpecBuilder.addType(
-                        TypeSpec.classBuilder(finalName).addModifiers(KModifier.DATA)
-                            .addSuperinterface(translatableInterface)
-                            .addConstructorParams(entry.arguments)
-                            .addFunction(funSpec)
-                            .build()
-                    )
+        val allFileBuilders = mutableMapOf<String, FileSpec.Builder>()
+        for ((packageName, entries) in finalMap.entries.sortedBy { it.key }) {
+            if (config.nestedSuffix != null && config.nestedSuffix in packageName) {
+                val parentPackage = packageName.substringBeforeLast(".")
+                val parentBuilder = allFileBuilders.getOrPut(parentPackage) {
+                    generateFileSpec(config, parentPackage)
                 }
+                parentBuilder.addType(TypeSpec.objectBuilder("K18n_" + packageName.substringAfterLast(".").removeSuffix(config.nestedSuffix)).apply {
+                    writeEntries(entries, config, this, withPrefix = false)
+                }.build())
+            } else {
+                val fileSpecBuilder = generateFileSpec(config, packageName)
+                writeEntries(entries, config, fileSpecBuilder, withPrefix = true)
+                allFileBuilders[packageName] = fileSpecBuilder
             }
-            fileSpecBuilder.build().writeTo(outputDir)
+        }
+        allFileBuilders.values.forEach { it.build().writeTo(outputDir) }
+
+    }
+
+    private fun generateFileSpec(
+        config: Config,
+        packageName: String
+    ): FileSpec.Builder = FileSpec.builder(
+        "${if (config.withBasePackage) "de.tectoast.k18n.generated." else ""}$packageName",
+        "data"
+    )
+
+    private fun writeEntries(
+        entries: Map<String, TranslationEntry>,
+        config: Config,
+        builder: TypeSpecHolder.Builder<*>,
+        withPrefix: Boolean
+    ) {
+        for ((objName, entry) in entries) {
+            val finalName = if(withPrefix) "K18n_${objName}" else objName
+            val funSpec = FunSpec.builder("translateTo")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("language", ClassName("de.tectoast.k18n.generated", "K18nLanguage"))
+                .returns(String::class)
+                .addCode(
+                    """
+                                    return when(language) {
+                                        ${
+                        entry.translations.entries.joinToString("\n") {
+                            val langs =
+                                if (it.key == config.defaultLanguage) (config.languages - entry.translations.keys) + config.defaultLanguage else listOf(
+                                    it.key
+                                )
+                            "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}" }} -> \"${it.value}\""
+                        }
+                    }
+                                    }
+                                    """.trimIndent()
+                )
+                .build()
+            if (entry.arguments.isEmpty()) {
+                builder.addType(
+                    TypeSpec.objectBuilder(finalName)
+                        .addSuperinterface(translatableInterface)
+                        .addFunction(funSpec).build()
+                )
+            } else {
+                builder.addType(
+                    TypeSpec.classBuilder(finalName).addModifiers(KModifier.DATA)
+                        .addSuperinterface(translatableInterface)
+                        .addConstructorParams(entry.arguments)
+                        .addFunction(funSpec)
+                        .build()
+                )
+            }
         }
     }
 
