@@ -9,7 +9,10 @@ class KtGeneration(val logger: Logger) {
         val translatableInterface = ClassName("de.tectoast.k18n.generated", "K18nMessage")
         generateMetaFile(config, outputDir)
         for ((packageName, entries) in finalMap) {
-            val fileSpecBuilder = FileSpec.builder("${if(config.withBasePackage) "de.tectoast.k18n.generated." else ""}$packageName", "data")
+            val fileSpecBuilder = FileSpec.builder(
+                "${if (config.withBasePackage) "de.tectoast.k18n.generated." else ""}$packageName",
+                "data"
+            )
             for ((objName, entry) in entries) {
                 val finalName = "K18n_${objName}"
                 val funSpec = FunSpec.builder("translateTo")
@@ -19,10 +22,15 @@ class KtGeneration(val logger: Logger) {
                     .addCode(
                         """
                                 return when(language) {
-                                    ${entry.translations.entries.joinToString("\n") {
-                                        val langs = if(it.key == config.defaultLanguage) (config.languages - entry.translations.keys) + config.defaultLanguage else listOf(it.key)
-                                        "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}"}} -> \"${it.value}\"" 
-                                    }}
+                                    ${
+                            entry.translations.entries.joinToString("\n") {
+                                val langs =
+                                    if (it.key == config.defaultLanguage) (config.languages - entry.translations.keys) + config.defaultLanguage else listOf(
+                                        it.key
+                                    )
+                                "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}" }} -> \"${it.value}\""
+                            }
+                        }
                                 }
                                 """.trimIndent()
                     )
@@ -87,6 +95,12 @@ class KtGeneration(val logger: Logger) {
                             .build()
                     )
                     .build()
+            )
+            .addProperty(
+                PropertySpec.builder(
+                    "K18N_DEFAULT_LANGUAGE",
+                    ClassName("de.tectoast.k18n.generated", "K18nLanguage")
+                ).initializer("K18nLanguage.${config.defaultLanguage.uppercase()}").build()
             )
             .build()
             .writeTo(outputDir)
