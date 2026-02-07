@@ -7,6 +7,7 @@ import kotlinx.serialization.Transient
 data class Config(
     val languages: List<String> = listOf("de", "en"),
     val defaultLanguage: String = "de",
+    val withBasePackage: Boolean = true,
     val customClasses: Map<String, CustomArgumentType> = mapOf("Mention" to CustomArgumentType("Long", "<@{var}>"))
 ) {
     @Transient

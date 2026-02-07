@@ -6,11 +6,12 @@ import java.io.File
 
 class KtGeneration(val logger: Logger) {
     fun generate(config: Config, outputDir: File, finalMap: Map<String, Map<String, TranslationEntry>>) {
-        val translatableInterface = ClassName("de.tectoast.k18n.generated", "Translatable")
+        val translatableInterface = ClassName("de.tectoast.k18n.generated", "K18nMessage")
         generateMetaFile(config, outputDir)
         for ((packageName, entries) in finalMap) {
-            val fileSpecBuilder = FileSpec.builder("de.tectoast.k18n.generated.$packageName", "data")
+            val fileSpecBuilder = FileSpec.builder("${if(config.withBasePackage) "de.tectoast.k18n.generated." else ""}$packageName", "data")
             for ((objName, entry) in entries) {
+                val finalName = "K18n_${objName}"
                 val funSpec = FunSpec.builder("translateTo")
                     .addModifiers(KModifier.OVERRIDE)
                     .addParameter("language", ClassName("de.tectoast.k18n.generated", "K18nLanguage"))
@@ -28,13 +29,13 @@ class KtGeneration(val logger: Logger) {
                     .build()
                 if (entry.arguments.isEmpty()) {
                     fileSpecBuilder.addType(
-                        TypeSpec.objectBuilder(objName)
+                        TypeSpec.objectBuilder(finalName)
                             .addSuperinterface(translatableInterface)
                             .addFunction(funSpec).build()
                     )
                 } else {
                     fileSpecBuilder.addType(
-                        TypeSpec.classBuilder(objName).addModifiers(KModifier.DATA)
+                        TypeSpec.classBuilder(finalName).addModifiers(KModifier.DATA)
                             .addSuperinterface(translatableInterface)
                             .addConstructorParams(entry.arguments)
                             .addFunction(funSpec)
@@ -70,14 +71,14 @@ class KtGeneration(val logger: Logger) {
         )
 
     fun generateMetaFile(config: Config, outputDir: File) {
-        FileSpec.builder("de.tectoast.k18n.generated", "Translatable")
+        FileSpec.builder("de.tectoast.k18n.generated", "meta")
             .addType(TypeSpec.enumBuilder("K18nLanguage").apply {
                 for (language in config.languages) {
                     addEnumConstant(language.uppercase())
                 }
             }.build())
             .addType(
-                TypeSpec.interfaceBuilder("Translatable")
+                TypeSpec.interfaceBuilder("K18nMessage")
                     .addFunction(
                         FunSpec.builder("translateTo")
                             .addParameter("language", ClassName("de.tectoast.k18n.generated", "K18nLanguage"))
