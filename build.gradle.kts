@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "de.tectoast"
-version = "2.2"
+version = "2.2.1"
 
 repositories {
     mavenCentral()

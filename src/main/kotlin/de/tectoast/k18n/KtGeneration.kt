@@ -60,7 +60,7 @@ class KtGeneration(val logger: Logger) {
                                 if (it.key == config.defaultLanguage) (config.languages - entry.translations.keys) + config.defaultLanguage else listOf(
                                     it.key
                                 )
-                            "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}" }} -> \"${it.value}\""
+                            "${langs.joinToString { l -> "K18nLanguage.${l.uppercase()}" }} -> \"${it.value.replace("\n", "\\n")}\""
                         }
                     }
                                     }
